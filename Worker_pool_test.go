@@ -1,6 +1,7 @@
 package simple_worker_pool
 
 import (
+	"sync"
 	"testing"
 	"time"
 )
@@ -20,9 +21,11 @@ func checkOutput(t *testing.T, output *chan string, isOutputExpected bool) {
 	}
 }
 
-func getCommandFunc(param string, input, output *chan string) func() {
+func getCommandFunc(param string, input, output *chan string, mu *sync.Mutex) func() {
 	return func() {
+		mu.Lock()
 		str, ok := <-*input
+		mu.Unlock()
 		if ok {
 			*output <- param + " " + str
 			time.Sleep(3 * time.Second)
@@ -33,8 +36,9 @@ func getCommandFunc(param string, input, output *chan string) func() {
 func TestWorkerPool(t *testing.T) {
 	input := make(chan string)
 	output := make(chan string)
+	mu := &sync.Mutex{}
 
-	command := CreateCommand(getCommandFunc("hello", &input, &output))
+	command := CreateCommand(getCommandFunc("hello", &input, &output, mu))
 
 	wp := CreateWorkerPool(command)
 
@@ -57,7 +61,9 @@ func TestWorkerPool(t *testing.T) {
 	close(input)
 	wp.SetNumOfWorkers(0)
 	time.Sleep(time.Second * 3)
+	mu.Lock()
 	input = make(chan string)
+	mu.Unlock()
 
 	go func() { input <- "world" }()
 
@@ -73,7 +79,9 @@ func TestWorkerPool(t *testing.T) {
 	close(input)
 	wp.SetNumOfWorkers(2)
 	time.Sleep(time.Second * 3)
+	mu.Lock()
 	input = make(chan string)
+	mu.Unlock()
 
 	input <- "world"
 	input <- "world"
@@ -92,7 +100,9 @@ func TestWorkerPool(t *testing.T) {
 	close(input)
 	wp.Stop()
 	time.Sleep(time.Second * 3)
+	mu.Lock()
 	input = make(chan string)
+	mu.Unlock()
 
 	go func() { input <- "world" }()
 
@@ -108,10 +118,12 @@ func TestWorkerPool(t *testing.T) {
 	wp.SetNumOfWorkers(1)
 	time.Sleep(time.Second)
 	close(input)
-	command = CreateCommand(getCommandFunc("goodbye", &input, &output))
+	command = CreateCommand(getCommandFunc("goodbye", &input, &output, mu))
 	wp.SetCommand(command)
 	time.Sleep(time.Second * 3)
+	mu.Lock()
 	input = make(chan string)
+	mu.Unlock()
 
 	input <- "world"
 
