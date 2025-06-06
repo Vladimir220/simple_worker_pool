@@ -126,7 +126,7 @@ func TestWorkerPool(t *testing.T) {
 		}
 	}
 
-	close(input)
 	wp.Stop()
+	close(input)
 	time.Sleep(time.Second * 3)
 }
